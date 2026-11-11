@@ -112,7 +112,7 @@ const faceCan = document.createElement('canvas'); faceCan.width = faceCan.height
 const fctx = faceCan.getContext('2d', { willReadFrequently: true });
 const maskCan = document.createElement('canvas'); maskCan.width = maskCan.height = FACE;
 const mctx = maskCan.getContext('2d');
-let skin = [0.85, 0.68, 0.58], hasFace = false, faceDirty = false;
+let skin = [0.85, 0.68, 0.58], faceW = 0.7, chinY = 0.98, hasFace = false, faceDirty = false;
 
 let OVAL = null;
 function ovalOrder(){
@@ -154,6 +154,7 @@ function captureFace(src, sw, sh, lm, mirror){
   if (n) skin = [r / n / 255, g / n / 255, b / n / 255];
 
   fctx.globalCompositeOperation = 'destination-in'; fctx.drawImage(maskCan, 0, 0); fctx.globalCompositeOperation = 'source-over';
+  faceW = (x1 - x0) / S; chinY = 0.5 + (y1 - cy) / S;
   hasFace = true; faceDirty = true;
 }
 
@@ -161,7 +162,7 @@ function captureFace(src, sw, sh, lm, mirror){
 const gl = out.getContext('webgl', { premultipliedAlpha: false });
 const VS = `attribute vec2 p;varying vec2 uv;void main(){uv=vec2(p.x*.5+.5,.5-p.y*.5);gl_Position=vec4(p,0.,1.);}`;
 const FS = `precision highp float;varying vec2 uv;
-uniform sampler2D tv,tf;uniform vec3 circ,skin;uniform float has;uniform vec2 res;
+uniform sampler2D tv,tf;uniform vec3 circ,skin;uniform float has,faceW,chinY;uniform vec2 res;
 float luma(vec3 c){return dot(c,vec3(.299,.587,.114));}
 void main(){
   vec3 c=texture2D(tv,uv).rgb;
@@ -170,13 +171,25 @@ void main(){
   float d=distance(px,cp)/r;
   float key=clamp((c.g-max(c.r,c.b)-.10)/.16,0.,1.);
   float dark=step(luma(c),.22)*step(c.b-c.r,.08)*(1.-smoothstep(.80,.88,d));
-  float a=(1.-smoothstep(1.03,1.10,d))*max(key,dark);
+  float inS=1.-smoothstep(1.03,1.10,d);
+  float g=inS*max(key,dark);              // 초록 머리 픽셀
+  // 얼굴 자체를 머리로: 턱을 목 위치에, 얼굴 폭이 초록 머리 폭을 덮도록
+  float k=(2.*r*1.14)/faceW;
+  vec2 fuv=vec2(.5,chinY)+(px-vec2(cp.x,cp.y+r*.97))/k;
+  vec4 f=texture2D(tf,clamp(fuv,0.,1.));
+  f.a*=step(0.,fuv.x)*step(fuv.x,1.)*step(0.,fuv.y)*step(fuv.y,1.);
+  // 초록 번짐 제거
   vec3 base=c;float near=1.-smoothstep(1.,1.25,d);
-  base.g-=max(0.,c.g-max(c.r,c.b))*near*(1.-a)*.85;
-  vec4 f=texture2D(tf,clamp((px-cp)/(2.*r)+.5,0.,1.));
-  vec3 col=mix(skin,f.rgb,f.a);
-  float sh=clamp(luma(c)/.62,.5,1.3);col*=mix(1.,sh,.55*key);
-  gl_FragColor=vec4(mix(base,col,a),1.);
+  base.g-=max(0.,c.g-max(c.r,c.b))*near*(1.-g)*.85;
+  // 얼굴이 못 덮은 초록은 목 그림자처럼
+  base=mix(base,skin*.55,g);
+  // 머리 안쪽: 초록 위에만(팔·소품은 앞에), 머리 밖: 얼굴을 그대로 위에
+  // 테두리 링: 팔(파랑)·몸(흰색)만 앞으로, 나머지(구 외곽선)는 얼굴로 덮기
+  float arm=max(step(.12,c.b-c.r)*step(c.g,c.b),step(.72,min(c.r,min(c.g,c.b))));
+  float inner=1.-smoothstep(.84,.92,d);
+  float occ=mix(1.-arm,g,inner);
+  float a=f.a*mix(1.,occ,inS);
+  gl_FragColor=vec4(mix(base,f.rgb,a),1.);
 }`;
 function shd(t, s){ const o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o); if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(o)); return o; }
 const prog = gl.createProgram();
@@ -202,7 +215,7 @@ function render(t){
   const fr = track.frames, c = fr[Math.min(fr.length - 1, Math.max(0, Math.floor((t ?? vid.currentTime) * track.fps + 0.001)))];
   gl.uniform3f(U('circ'), c ? c[0] : 0, c ? c[1] : 0, c ? c[2] : 0);
   gl.uniform3f(U('skin'), skin[0], skin[1], skin[2]);
-  gl.uniform1f(U('has'), hasFace ? 1 : 0);
+  gl.uniform1f(U('has'), hasFace ? 1 : 0); gl.uniform1f(U('faceW'), faceW); gl.uniform1f(U('chinY'), chinY);
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 }
 if ('requestVideoFrameCallback' in HTMLVideoElement.prototype){
@@ -218,7 +231,7 @@ async function engine(mode){
   if (!lmk){
     lmkLoading ??= (async () => {
       const fs = await FilesetResolver.forVisionTasks(new URL('lib/wasm', location.href).href);
-      const opt = d => ({ baseOptions: { modelAssetPath: 'assets/face_landmarker.task', delegate: d }, runningMode: mode, numFaces: 1, minFaceDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+      const opt = d => ({ baseOptions: { modelAssetPath: 'assets/face_landmarker.task', delegate: d }, runningMode: mode, numFaces: 1, minFaceDetectionConfidence: 0.3, minFacePresenceConfidence: 0.3, minTrackingConfidence: 0.3 });
       try { lmk = await FaceLandmarker.createFromOptions(fs, opt('GPU')); } catch (e) { lmk = await FaceLandmarker.createFromOptions(fs, opt('CPU')); }
       lmkMode = mode;
     })();
@@ -235,21 +248,21 @@ function unlockAudio(){ if (audioUnlocked) return; audioUnlocked = true; vid.mut
   const p = vid.play(); p && p.then(() => { if ($('play').classList.contains('off')){ vid.pause(); vid.currentTime = 0; } }).catch(() => {}); }
 
 /* 카메라 스캔 */
-let stream = null, raf = 0, holdStart = 0, lastTs = 0, done = false;
+let stream = null, raf = 0, hold = 0, badMs = 0, lastFrame = 0, goodLm = null, scanStart = 0, lastTs = 0, done = false;
 const progEl = $('prog'), msg = $('msg');
 function setMsg(t, ok){ if (msg.textContent !== t) msg.textContent = t; msg.classList.toggle('ok', !!ok); }
 function setProg(p){ progEl.style.strokeDasharray = `${Math.max(0, Math.min(100, p * 100))} 100`; progEl.style.opacity = p > 0.005 ? 1 : 0; }
 
 async function startScan(){
-  show('scanScr'); done = false; holdStart = 0; setProg(0);
+  show('scanScr'); done = false; hold = 0; badMs = 0; lastFrame = 0; goodLm = null; setProg(0);
   progEl.classList.remove('done'); $('check').classList.remove('on');
   setMsg('카메라를 준비하고 있어요');
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 720 }, height: { ideal: 960 } }, audio: false });
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 } }, audio: false });
   } catch (e) { setMsg('카메라 권한을 허용해주세요'); toast('설정에서 카메라 권한을 켜주세요'); return; }
   camVid.srcObject = stream; await camVid.play().catch(() => {});
   await engine('VIDEO'); $('loading').style.display = 'none';
-  cancelAnimationFrame(raf); loop();
+  scanStart = performance.now(); cancelAnimationFrame(raf); loop();
 }
 function stopScan(){ cancelAnimationFrame(raf); if (stream){ stream.getTracks().forEach(t => t.stop()); stream = null; } camVid.srcObject = null; }
 
@@ -264,10 +277,11 @@ function check(lm){
   const nose = toSvg(lm[1])[0], L = toSvg(lm[234])[0], R = toSvg(lm[454])[0];
   const yaw = (nose - Math.min(L, R)) / Math.max(1, Math.abs(R - L));
   const roll = Math.abs(lm[33].y - lm[263].y) / Math.max(1e-3, Math.abs(lm[33].x - lm[263].x));
-  if (h < 290 * 0.62) return '조금 더 가까이 와주세요';
-  if (h > 290 * 1.05) return '조금만 뒤로 가주세요';
-  if (Math.abs(cx - 150) > 30 || Math.abs(cy - 205) > 38) return '얼굴을 원 가운데에 맞춰주세요';
-  if (yaw < 0.33 || yaw > 0.67 || roll > 0.2) return '정면을 바라봐주세요';
+  const relax = scanStart && performance.now() - scanStart > 6000 ? 1.5 : 1; // 오래 걸리면 조건 완화
+  if (h < 290 * 0.42 / relax) return '조금 더 가까이 와주세요';
+  if (h > 290 * 1.25 * relax) return '조금만 뒤로 가주세요';
+  if (Math.abs(cx - 150) > 55 * relax || Math.abs(cy - 200) > 70 * relax) return '얼굴을 원 가운데에 맞춰주세요';
+  if (yaw < 0.22 / relax || yaw > 1 - 0.22 / relax || roll > 0.35 * relax) return '정면을 바라봐주세요';
   return null;
 }
 function loop(){
@@ -276,16 +290,20 @@ function loop(){
   let ts = performance.now(); if (ts <= lastTs) ts = lastTs + 1; lastTs = ts;
   const res = lmk.detectForVideo(camVid, ts);
   const lm = res.faceLandmarks && res.faceLandmarks[0];
-  if (!lm){ holdStart = 0; setProg(0); setMsg('얼굴이 보이지 않아요'); return; }
-  const problem = check(lm);
-  if (problem){ holdStart = 0; setProg(0); setMsg(problem); return; }
-  if (!holdStart) holdStart = ts;
-  const p = (ts - holdStart) / HOLD_MS; setProg(p);
-  setMsg('좋아요! 그대로 유지해주세요', true);
+  const dt = Math.min(100, ts - (lastFrame || ts)); lastFrame = ts;
+  const problem = lm ? check(lm) : '얼굴이 보이지 않아요';
+  if (problem){
+    badMs += dt;
+    if (badMs > 350){ hold = Math.max(0, hold - dt * 1.5); setMsg(problem); }
+  } else {
+    badMs = 0; hold += dt; goodLm = lm;
+    setMsg('좋아요! 그대로 유지해주세요', true);
+  }
+  const p = hold / HOLD_MS; setProg(p);
   if (p >= 1){
     done = true; progEl.classList.add('done'); $('check').classList.add('on'); setMsg('인식 완료!', true);
     navigator.vibrate && navigator.vibrate(40);
-    captureFace(camVid, camVid.videoWidth, camVid.videoHeight, lm, true);
+    captureFace(camVid, camVid.videoWidth, camVid.videoHeight, lm || goodLm, true);
     setTimeout(() => { stopScan(); startPlay(); }, 650);
   }
 }
