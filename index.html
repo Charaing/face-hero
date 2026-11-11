@@ -2,304 +2,316 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0b0f0c">
-<title>내 얼굴 히어로 — FACE HERO</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#ffffff">
+<title>치약 히어로 — 내 얼굴로 변신</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <style>
-  :root{--bg:#0b0f0c;--panel:#141a16;--line:#25302a;--txt:#eaf5ec;--dim:#8fa597;--neon:#39ff6a;--red:#ff3b54}
-  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  html,body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Noto Sans KR",sans-serif}
-  main{max-width:520px;margin:0 auto;padding:max(14px,env(safe-area-inset-top)) 14px 40px}
-  header{display:flex;align-items:baseline;justify-content:space-between;margin:4px 2px 12px}
-  h1{font-size:22px;margin:0;letter-spacing:-.5px;font-weight:900}
-  h1 b{color:var(--neon)}
-  .tag{font-size:12px;color:var(--dim)}
-  .stage{position:relative;width:100%;aspect-ratio:9/16;border-radius:18px;overflow:hidden;background:#000;border:1px solid var(--line)}
-  #out{width:100%;height:100%;display:block}
-  .cam{position:absolute;right:10px;top:10px;width:26%;aspect-ratio:1;border-radius:50%;overflow:hidden;border:3px solid var(--neon);background:#111;box-shadow:0 4px 18px #0008;display:none}
-  .cam canvas{width:100%;height:100%;display:block}
-  .cam.miss{border-color:var(--red)}
-  .overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:#000b;text-align:center;padding:24px}
-  .overlay.hide{display:none}
-  .big{font-size:18px;font-weight:800}
-  .status{position:absolute;left:10px;bottom:10px;right:10px;font-size:13px;background:#000a;padding:7px 10px;border-radius:10px;backdrop-filter:blur(6px)}
-  .status.hide{display:none}
-  .rec{position:absolute;left:12px;top:12px;background:var(--red);color:#fff;font-weight:800;font-size:12px;padding:5px 9px;border-radius:99px;display:none;animation:bl 1s infinite}
-  @keyframes bl{50%{opacity:.4}}
-  .row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
-  button,.btn{appearance:none;border:1px solid var(--line);background:var(--panel);color:var(--txt);font:inherit;font-weight:700;font-size:15px;padding:14px 10px;border-radius:14px;cursor:pointer;text-align:center;display:block}
-  button:active,.btn:active{transform:scale(.98)}
-  button.pri{background:var(--neon);color:#062010;border-color:var(--neon)}
-  button.on{border-color:var(--neon);color:var(--neon)}
-  button:disabled{opacity:.4}
-  .wide{grid-column:1/-1}
-  .ctl{margin-top:14px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px}
-  .ctl label{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--dim);margin:6px 0}
-  .ctl label span{width:64px;flex:none}
-  .ctl input[type=range]{flex:1;accent-color:var(--neon)}
+  :root{--blue:#3182f6;--blue-d:#1b64da;--g900:#191f28;--g700:#4e5968;--g500:#8b95a1;--g200:#e5e8eb;--g100:#f2f4f6;--ok:#00c471}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0}
+  html,body{height:100%;background:#fff;color:var(--g900);font-family:Pretendard,-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden}
+  .screen{position:fixed;inset:0;display:flex;flex-direction:column;padding:calc(env(safe-area-inset-top) + 56px) 24px calc(env(safe-area-inset-bottom) + 20px);transition:opacity .35s,transform .35s}
+  .screen.off{opacity:0;pointer-events:none;transform:translateY(12px)}
+  h1{font-size:26px;line-height:1.38;font-weight:700;letter-spacing:-.6px}
+  .sub{margin-top:10px;font-size:17px;color:var(--g700);line-height:1.5;letter-spacing:-.3px;min-height:26px;transition:color .2s}
+  .sub.ok{color:var(--blue)}
+  .cta{width:100%;height:56px;border:0;border-radius:16px;background:var(--blue);color:#fff;font:inherit;font-size:17px;font-weight:600;cursor:pointer;transition:transform .1s,background .2s}
+  .cta:active{transform:scale(.97);background:var(--blue-d)}
+  .ghost{margin-top:8px;width:100%;height:48px;border:0;background:none;color:var(--g500);font:inherit;font-size:15px;font-weight:500;cursor:pointer}
+  .hero{display:flex;justify-content:center;align-items:center;flex:1}
+  .hero-ball{width:200px;height:200px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#c9ffd2 0,#4cf06b 30%,#1fc243 75%,#119a30 100%);position:relative;box-shadow:0 30px 60px -20px #1fc24366;animation:bob 2.4s ease-in-out infinite}
+  .hero-ball::before,.hero-ball::after{content:"";position:absolute;top:42%;width:12px;height:12px;border-radius:50%;background:#16351d}
+  .hero-ball::before{left:36%}.hero-ball::after{right:36%}
+  @keyframes bob{50%{transform:translateY(-10px)}}
+  .chips{display:flex;gap:8px;justify-content:center;margin-bottom:28px;flex-wrap:wrap}
+  .chip{background:var(--g100);color:var(--g700);font-size:13px;font-weight:500;padding:7px 12px;border-radius:99px}
+  .scan-wrap{flex:1;display:flex;align-items:center;justify-content:center;min-height:0}
+  .scan{position:relative;width:min(84vw,340px);aspect-ratio:3/4;max-height:100%}
+  .scan video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);background:#fff}
+  .scan svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+  .guide{fill:none;stroke:var(--g200);stroke-width:5}
+  .prog{fill:none;stroke:var(--blue);stroke-width:5;stroke-linecap:round;stroke-dasharray:0 100;transition:stroke .2s}
+  .prog.done{stroke:var(--ok)}
+  .check{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:0;transform:scale(.6);transition:all .3s cubic-bezier(.2,1.4,.4,1)}
+  .check.on{opacity:1;transform:scale(1)}
+  .check div{width:84px;height:84px;border-radius:50%;background:var(--ok);display:flex;align-items:center;justify-content:center;box-shadow:0 10px 30px #00c47155}
+  .loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--g500);font-size:15px}
+  .spin{width:28px;height:28px;border:3px solid var(--g200);border-top-color:var(--blue);border-radius:50%;animation:sp .8s linear infinite;margin-right:10px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .tip{text-align:center;color:var(--g500);font-size:14px;margin-top:8px}
+  .back{position:absolute;top:calc(env(safe-area-inset-top) + 8px);left:8px;width:44px;height:44px;border:0;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  #play{background:#000;padding:0;align-items:center;justify-content:center}
+  #out{height:100%;max-width:100%;aspect-ratio:9/16;object-fit:contain;display:block}
+  .exit{position:absolute;top:calc(env(safe-area-inset-top) + 14px);right:14px;height:38px;padding:0 16px;border-radius:99px;border:1px solid #ffffff40;background:#ffffff2e;color:#fff;font:inherit;font-size:15px;font-weight:600;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);cursor:pointer;z-index:5}
+  .exit:active{background:#ffffff4d}
+  .sound{position:absolute;left:50%;bottom:calc(env(safe-area-inset-bottom) + 24px);transform:translateX(-50%);height:40px;padding:0 18px;border-radius:99px;border:0;background:#ffffffe6;color:var(--g900);font:inherit;font-weight:600;font-size:15px;display:none;cursor:pointer}
+  .toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 100px);transform:translate(-50%,10px);background:#191f28e6;color:#fff;font-size:15px;padding:12px 18px;border-radius:14px;opacity:0;transition:all .25s;pointer-events:none;white-space:nowrap;z-index:9}
+  .toast.on{opacity:1;transform:translate(-50%,0)}
   input[type=file]{display:none}
-  .foot{margin-top:16px;font-size:12px;color:var(--dim);line-height:1.6}
-  a{color:var(--neon)}
 </style>
 </head>
 <body>
-<main>
-  <header><h1>FACE <b>HERO</b></h1><span class="tag">얼굴 인식 → 초록 머리 합성</span></header>
 
-  <div class="stage">
-    <canvas id="out" width="720" height="1280"></canvas>
-    <div class="cam" id="camBox"><canvas id="camView" width="256" height="256"></canvas></div>
-    <div class="rec" id="recBadge">● REC</div>
-    <div class="status hide" id="status"></div>
-    <div class="overlay" id="overlay">
-      <div class="big">내 얼굴을 히어로 머리에!</div>
-      <div class="tag">카메라로 실시간 인식하거나 사진을 올려줘</div>
+<section class="screen" id="intro">
+  <h1>내 얼굴로<br>치약 히어로가 되어볼까요?</h1>
+  <p class="sub">얼굴을 인식하면 영상 속 초록 머리가<br>내 얼굴로 바뀌어요</p>
+  <div class="hero"><div class="hero-ball"></div></div>
+  <div class="chips"><span class="chip">📷 사진은 저장되지 않아요</span><span class="chip">🔒 폰 안에서만 처리</span></div>
+  <button class="cta" id="start">시작하기</button>
+  <button class="ghost" id="photoBtn">사진으로 할게요</button>
+  <input type="file" id="file" accept="image/*">
+</section>
+
+<section class="screen off" id="scanScr">
+  <button class="back" id="back" aria-label="뒤로"><svg width="24" height="24" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none" stroke="#191f28" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+  <h1>얼굴을 원 안에<br>맞춰주세요</h1>
+  <p class="sub" id="msg">카메라를 준비하고 있어요</p>
+  <div class="scan-wrap">
+    <div class="scan" id="scanBox">
+      <video id="camVid" playsinline muted autoplay></video>
+      <svg viewBox="0 0 300 400" preserveAspectRatio="none">
+        <path fill="#fff" fill-rule="evenodd" d="M-2-2H302V402H-2Z M150 55 a112 145 0 1 0 0.01 0Z"/>
+        <ellipse class="guide" cx="150" cy="200" rx="112" ry="145"/>
+        <ellipse class="prog" id="prog" cx="150" cy="200" rx="112" ry="145" pathLength="100" transform="rotate(-90 150 200)"/>
+      </svg>
+      <div class="loading" id="loading"><div class="spin"></div>얼굴 인식 준비 중</div>
+      <div class="check" id="check"><div><svg width="44" height="44" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="#fff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
     </div>
   </div>
+  <p class="tip">밝은 곳에서, 정면을 보고 2초간 유지해주세요</p>
+</section>
 
-  <div class="row">
-    <button class="pri" id="btnCam">📷 카메라로 인식</button>
-    <label class="btn" for="file">🖼️ 사진 올리기</label>
-    <input type="file" id="file" accept="image/*">
-    <button id="btnPlay" disabled>▶ 재생</button>
-    <button id="btnFreeze" disabled>📌 얼굴 고정</button>
-    <button class="wide" id="btnRec" disabled>⏺ 처음부터 녹화해서 저장</button>
-  </div>
+<section class="screen off" id="play">
+  <canvas id="out" width="720" height="1280"></canvas>
+  <button class="exit" id="exit">나가기</button>
+  <button class="sound" id="sound">🔊 소리 켜기</button>
+</section>
 
-  <div class="ctl">
-    <label><span>얼굴 크기</span><input id="zoom" type="range" min="0.7" max="1.6" step="0.01" value="1"></label>
-    <label><span>위/아래</span><input id="offY" type="range" min="-0.3" max="0.3" step="0.01" value="0"></label>
-    <label><span>입체감</span><input id="shade" type="range" min="0" max="1" step="0.01" value="0.55"></label>
-  </div>
-
-  <p class="foot">얼굴 인식은 전부 내 폰 안에서만 돌아가고, 사진·영상은 어디에도 업로드되지 않아.<br>얼굴 인식: MediaPipe Face Detector</p>
-</main>
-
+<div class="toast" id="toast"></div>
 <video id="vid" src="assets/hero.mp4" playsinline loop preload="auto" crossorigin="anonymous" style="display:none"></video>
-<video id="camVid" playsinline muted style="display:none"></video>
 
 <script type="module">
-import { FaceDetector, FilesetResolver } from "./lib/vision_bundle.mjs";
-
+import { FaceLandmarker, FilesetResolver } from "./lib/vision_bundle.mjs";
 const $ = id => document.getElementById(id);
 const vid = $('vid'), camVid = $('camVid'), out = $('out');
-const statusEl = $('status');
-const setStatus = (t) => { statusEl.textContent = t || ''; statusEl.classList.toggle('hide', !t); };
+const HOLD_MS = 2000;
 
-/* ---------- 초록 머리 위치 데이터 (영상 분석으로 미리 추출) ---------- */
+/* 화면 전환 */
+function show(id){ ['intro','scanScr','play'].forEach(s => $(s).classList.toggle('off', s !== id));
+  document.querySelector('meta[name=theme-color]').content = id === 'play' ? '#000000' : '#ffffff';
+  document.body.style.background = id === 'play' ? '#000' : '#fff'; }
+let toastT; function toast(t){ const e = $('toast'); e.textContent = t; e.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => e.classList.remove('on'), 2200); }
+
+/* 초록 머리 추적 데이터 (영상 분석으로 미리 추출) */
 let track = { fps: 24, frames: [] };
 fetch('assets/track.json').then(r => r.json()).then(j => track = j);
 
-/* ---------- 얼굴 텍스처 캔버스 ---------- */
+/* 얼굴 누끼 텍스처 */
 const FACE = 512;
 const faceCan = document.createElement('canvas'); faceCan.width = faceCan.height = FACE;
-const fctx = faceCan.getContext('2d');
-let hasFace = false, faceDirty = false, frozen = false;
-const camView = $('camView'), cvctx = camView.getContext('2d');
+const fctx = faceCan.getContext('2d', { willReadFrequently: true });
+const maskCan = document.createElement('canvas'); maskCan.width = maskCan.height = FACE;
+const mctx = maskCan.getContext('2d');
+let skin = [0.85, 0.68, 0.58], hasFace = false, faceDirty = false;
 
-/* ---------- WebGL 합성 ---------- */
-const gl = out.getContext('webgl', { preserveDrawingBuffer: false, premultipliedAlpha: false });
+let OVAL = null;
+function ovalOrder(){
+  if (OVAL) return OVAL;
+  const conn = FaceLandmarker.FACE_LANDMARKS_FACE_OVAL, next = {};
+  conn.forEach(c => next[c.start] = c.end);
+  const order = [conn[0].start]; let cur = next[conn[0].start];
+  while (cur !== undefined && cur !== order[0] && order.length < 100){ order.push(cur); cur = next[cur]; }
+  return OVAL = order;
+}
+
+// 랜드마크 윤곽으로 얼굴만 오려서 텍스처로
+function captureFace(src, sw, sh, lm, mirror){
+  const P = ovalOrder().map(i => [lm[i].x * sw, lm[i].y * sh]);
+  let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+  P.forEach(([x, y]) => { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); });
+  const H = y1 - y0, ext = H * 0.06; y0 -= ext;              // 윤곽 맨 위가 이마 중간이라 살짝 위로
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, S = (y1 - y0) * 1.02;
+  const tx = (x, y) => { const u = (x - cx) / S * FACE + FACE / 2, v = (y - cy) / S * FACE + FACE / 2; return [mirror ? FACE - u : u, v]; };
+  const T = P.map(([x, y]) => { const k = Math.max(0, (cy - y) / (H / 2)); return tx(x, y - ext * k * k); });
+
+  // 마스크: 윤곽 채우고 가장자리는 안쪽으로 부드럽게
+  mctx.globalCompositeOperation = 'source-over'; mctx.clearRect(0, 0, FACE, FACE); mctx.fillStyle = '#fff';
+  const path = new Path2D(); T.forEach(([u, v], i) => i ? path.lineTo(u, v) : path.moveTo(u, v)); path.closePath();
+  mctx.fill(path);
+  mctx.globalCompositeOperation = 'destination-out'; mctx.lineJoin = 'round'; mctx.strokeStyle = 'rgba(0,0,0,.16)';
+  for (let w = 26; w >= 2; w -= 4){ mctx.lineWidth = w; mctx.stroke(path); }
+
+  fctx.save(); fctx.globalCompositeOperation = 'source-over'; fctx.clearRect(0, 0, FACE, FACE);
+  if (mirror){ fctx.translate(FACE, 0); fctx.scale(-1, 1); }
+  const sc = FACE / S; fctx.translate(FACE / 2, FACE / 2); fctx.scale(sc, sc); fctx.translate(-cx, -cy);
+  fctx.drawImage(src, 0, 0, sw, sh); fctx.restore();
+
+  // 피부색 (양 볼, 이마, 턱 주변 평균) → 얼굴 바깥 머리 부분 채움
+  let r = 0, g = 0, b = 0, n = 0;
+  [50, 280, 151, 205, 425].map(i => tx(lm[i].x * sw, lm[i].y * sh)).forEach(([u, v]) => {
+    const d = fctx.getImageData(Math.max(0, u - 6) | 0, Math.max(0, v - 6) | 0, 12, 12).data;
+    for (let i = 0; i < d.length; i += 4){ r += d[i]; g += d[i + 1]; b += d[i + 2]; n++; } });
+  if (n) skin = [r / n / 255, g / n / 255, b / n / 255];
+
+  fctx.globalCompositeOperation = 'destination-in'; fctx.drawImage(maskCan, 0, 0); fctx.globalCompositeOperation = 'source-over';
+  hasFace = true; faceDirty = true;
+}
+
+/* WebGL 합성 */
+const gl = out.getContext('webgl', { premultipliedAlpha: false });
 const VS = `attribute vec2 p;varying vec2 uv;void main(){uv=vec2(p.x*.5+.5,.5-p.y*.5);gl_Position=vec4(p,0.,1.);}`;
 const FS = `precision highp float;varying vec2 uv;
-uniform sampler2D tv,tf;uniform vec3 circ;uniform float has,zoom,offY,shadeAmt;uniform vec2 res;
+uniform sampler2D tv,tf;uniform vec3 circ,skin;uniform float has;uniform vec2 res;
 float luma(vec3 c){return dot(c,vec3(.299,.587,.114));}
 void main(){
-  vec4 v=texture2D(tv,uv);vec3 c=v.rgb;
-  if(circ.z<=0.){gl_FragColor=vec4(c,1.);return;}
-  vec2 px=uv*res;vec2 cp=vec2(circ.x,circ.y)*res;float r=circ.z*res.x;
+  vec3 c=texture2D(tv,uv).rgb;
+  if(circ.z<=0.||has<.5){gl_FragColor=vec4(c,1.);return;}
+  vec2 px=uv*res;vec2 cp=circ.xy*res;float r=circ.z*res.x;
   float d=distance(px,cp)/r;
   float key=clamp((c.g-max(c.r,c.b)-.10)/.16,0.,1.);
   float dark=step(luma(c),.22)*step(c.b-c.r,.08)*(1.-smoothstep(.80,.88,d));
-  float region=1.-smoothstep(1.03,1.10,d);
-  float a=region*max(key,dark);
-  // 가장자리 초록 번짐 제거
-  float near=1.-smoothstep(1.0,1.25,d);
-  vec3 base=c; float spill=max(0.,c.g-max(c.r,c.b));
-  base.g-=spill*near*(1.-a)*.85;
-  if(has<.5){gl_FragColor=vec4(c,1.);return;}
-  vec2 q=(px-cp)/(2.*r*zoom); q.y-=offY; vec2 fuv=q+.5;
-  vec3 f=texture2D(tf,clamp(fuv,0.,1.)).rgb;
-  // 원래 구의 명암을 얼굴에 입혀 입체감
-  float sh=clamp(luma(c)/.62,.45,1.35); sh=mix(1.,sh,shadeAmt*key);
-  f*=sh;
-  gl_FragColor=vec4(mix(base,f,a),1.);
+  float a=(1.-smoothstep(1.03,1.10,d))*max(key,dark);
+  vec3 base=c;float near=1.-smoothstep(1.,1.25,d);
+  base.g-=max(0.,c.g-max(c.r,c.b))*near*(1.-a)*.85;
+  vec4 f=texture2D(tf,clamp((px-cp)/(2.*r)+.5,0.,1.));
+  vec3 col=mix(skin,f.rgb,f.a);
+  float sh=clamp(luma(c)/.62,.5,1.3);col*=mix(1.,sh,.55*key);
+  gl_FragColor=vec4(mix(base,col,a),1.);
 }`;
-function sh(type, src){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw gl.getShaderInfoLog(s);return s;}
+function shd(t, s){ const o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o); if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(o)); return o; }
 const prog = gl.createProgram();
-gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
-gl.linkProgram(prog); gl.useProgram(prog);
-const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+gl.attachShader(prog, shd(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, shd(gl.FRAGMENT_SHADER, FS)); gl.linkProgram(prog); gl.useProgram(prog);
+gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
 gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,1,1]), gl.STATIC_DRAW);
-const loc = gl.getAttribLocation(prog, 'p'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-function mkTex(unit){const t=gl.createTexture();gl.activeTexture(gl.TEXTURE0+unit);gl.bindTexture(gl.TEXTURE_2D,t);
-  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
-  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([0,0,0,255]));return t;}
+const aLoc = gl.getAttribLocation(prog, 'p'); gl.enableVertexAttribArray(aLoc); gl.vertexAttribPointer(aLoc, 2, gl.FLOAT, false, 0, 0);
+function mkTex(unit){ const t = gl.createTexture(); gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, t);
+  [[gl.TEXTURE_MIN_FILTER, gl.LINEAR], [gl.TEXTURE_MAG_FILTER, gl.LINEAR], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]].forEach(([k, v]) => gl.texParameteri(gl.TEXTURE_2D, k, v));
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4)); return t; }
 const texV = mkTex(0), texF = mkTex(1);
 const U = n => gl.getUniformLocation(prog, n);
 gl.uniform1i(U('tv'), 0); gl.uniform1i(U('tf'), 1); gl.uniform2f(U('res'), 720, 1280);
 
-function circleAt(t){
-  const fr = track.frames; if (!fr.length) return null;
-  const i = Math.min(fr.length - 1, Math.max(0, Math.floor(t * track.fps + 0.001)));
-  return fr[i];
-}
 let videoReady = false;
-function render(mediaTime){
+function render(t){
   if (!videoReady) return;
-  gl.viewport(0, 0, out.width, out.height);
+  gl.viewport(0, 0, 720, 1280);
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, texV);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, vid);
   if (faceDirty){ gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, texF);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, faceCan); faceDirty = false; }
-  const c = circleAt(mediaTime ?? vid.currentTime);
+  const fr = track.frames, c = fr[Math.min(fr.length - 1, Math.max(0, Math.floor((t ?? vid.currentTime) * track.fps + 0.001)))];
   gl.uniform3f(U('circ'), c ? c[0] : 0, c ? c[1] : 0, c ? c[2] : 0);
+  gl.uniform3f(U('skin'), skin[0], skin[1], skin[2]);
   gl.uniform1f(U('has'), hasFace ? 1 : 0);
-  gl.uniform1f(U('zoom'), +$('zoom').value);
-  gl.uniform1f(U('offY'), +$('offY').value);
-  gl.uniform1f(U('shadeAmt'), +$('shade').value);
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 }
-// 영상 프레임에 정확히 맞춰 그리기
 if ('requestVideoFrameCallback' in HTMLVideoElement.prototype){
-  const loop = (now, meta) => { render(meta.mediaTime); vid.requestVideoFrameCallback(loop); };
-  vid.requestVideoFrameCallback(loop);
-} else {
-  const loop = () => { render(); requestAnimationFrame(loop); }; requestAnimationFrame(loop);
-}
-vid.addEventListener('loadeddata', () => { videoReady = true; $('btnPlay').disabled = false; $('btnRec').disabled = false; render(0); });
+  const loop = (now, m) => { render(m.mediaTime); vid.requestVideoFrameCallback(loop); }; vid.requestVideoFrameCallback(loop);
+} else { const loop = () => { render(); requestAnimationFrame(loop); }; requestAnimationFrame(loop); }
+vid.addEventListener('loadeddata', () => { videoReady = true; render(0); });
 vid.addEventListener('seeked', () => render());
-vid.addEventListener('play', () => $('btnPlay').textContent = '⏸ 일시정지');
-vid.addEventListener('pause', () => $('btnPlay').textContent = '▶ 재생');
 vid.load();
 
-/* ---------- 얼굴 인식 ---------- */
-let detector = null, detMode = null;
-async function getDetector(mode){
-  if (!detector){
-    setStatus('얼굴 인식 엔진 불러오는 중…');
-    const fs = await FilesetResolver.forVisionTasks(new URL('lib/wasm', location.href).href.replace(/\/$/, ''));
-    const base = { modelAssetPath: 'assets/face_detector.tflite' };
-    try { detector = await FaceDetector.createFromOptions(fs, { baseOptions: { ...base, delegate: 'GPU' }, runningMode: mode, minDetectionConfidence: 0.5 }); }
-    catch (e) { detector = await FaceDetector.createFromOptions(fs, { baseOptions: { ...base, delegate: 'CPU' }, runningMode: mode, minDetectionConfidence: 0.5 }); }
-    detMode = mode; setStatus('');
+/* 얼굴 인식 엔진 (MediaPipe Face Landmarker) */
+let lmk = null, lmkMode = null, lmkLoading = null;
+async function engine(mode){
+  if (!lmk){
+    lmkLoading ??= (async () => {
+      const fs = await FilesetResolver.forVisionTasks(new URL('lib/wasm', location.href).href);
+      const opt = d => ({ baseOptions: { modelAssetPath: 'assets/face_landmarker.task', delegate: d }, runningMode: mode, numFaces: 1, minFaceDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+      try { lmk = await FaceLandmarker.createFromOptions(fs, opt('GPU')); } catch (e) { lmk = await FaceLandmarker.createFromOptions(fs, opt('CPU')); }
+      lmkMode = mode;
+    })();
+    await lmkLoading;
   }
-  if (detMode !== mode){ await detector.setOptions({ runningMode: mode }); detMode = mode; }
-  return detector;
+  if (lmkMode !== mode){ await lmk.setOptions({ runningMode: mode }); lmkMode = mode; }
+  return lmk;
 }
-function biggest(res){
-  if (!res || !res.detections || !res.detections.length) return null;
-  return res.detections.reduce((a, b) => (b.boundingBox.width * b.boundingBox.height > a.boundingBox.width * a.boundingBox.height ? b : a)).boundingBox;
+engine('VIDEO').catch(e => console.error(e));
+
+/* iOS 소리 잠금 해제 */
+let audioUnlocked = false;
+function unlockAudio(){ if (audioUnlocked) return; audioUnlocked = true; vid.muted = false;
+  const p = vid.play(); p && p.then(() => { if ($('play').classList.contains('off')){ vid.pause(); vid.currentTime = 0; } }).catch(() => {}); }
+
+/* 카메라 스캔 */
+let stream = null, raf = 0, holdStart = 0, lastTs = 0, done = false;
+const progEl = $('prog'), msg = $('msg');
+function setMsg(t, ok){ if (msg.textContent !== t) msg.textContent = t; msg.classList.toggle('ok', !!ok); }
+function setProg(p){ progEl.style.strokeDasharray = `${Math.max(0, Math.min(100, p * 100))} 100`; progEl.style.opacity = p > 0.005 ? 1 : 0; }
+
+async function startScan(){
+  show('scanScr'); done = false; holdStart = 0; setProg(0);
+  progEl.classList.remove('done'); $('check').classList.remove('on');
+  setMsg('카메라를 준비하고 있어요');
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 720 }, height: { ideal: 960 } }, audio: false });
+  } catch (e) { setMsg('카메라 권한을 허용해주세요'); toast('설정에서 카메라 권한을 켜주세요'); return; }
+  camVid.srcObject = stream; await camVid.play().catch(() => {});
+  await engine('VIDEO'); $('loading').style.display = 'none';
+  cancelAnimationFrame(raf); loop();
 }
-// 얼굴 박스 → 정사각형 크롭(이마·턱 포함)해서 텍스처로
-let sm = null;
-function cropFace(src, sw, sh, box, mirror, smooth){
-  let cx = box.originX + box.width / 2, cy = box.originY + box.height * 0.42;
-  let s = Math.max(box.width, box.height) * 1.32;
-  if (smooth && sm){ const k = 0.35; cx = sm.cx + (cx - sm.cx) * k; cy = sm.cy + (cy - sm.cy) * k; s = sm.s + (s - sm.s) * k; }
-  sm = { cx, cy, s };
-  fctx.save(); fctx.fillStyle = '#d9b49a'; fctx.fillRect(0, 0, FACE, FACE);
-  const sc = FACE / s;
-  if (mirror){ fctx.translate(FACE, 0); fctx.scale(-1, 1); }
-  fctx.translate(FACE / 2, FACE / 2); fctx.scale(sc, sc); fctx.translate(-cx, -cy);
-  fctx.drawImage(src, 0, 0, sw, sh);
-  fctx.restore();
-  hasFace = true; faceDirty = true;
-  cvctx.drawImage(faceCan, 0, 0, camView.width, camView.height);
-  if (vid.paused) render();
+function stopScan(){ cancelAnimationFrame(raf); if (stream){ stream.getTracks().forEach(t => t.stop()); stream = null; } camVid.srcObject = null; }
+
+// 가이드 원(SVG 300x400 좌표)과 얼굴 위치 비교 → 문제 있으면 안내 문구
+function check(lm){
+  const box = $('scanBox').getBoundingClientRect(), vw = camVid.videoWidth, vh = camVid.videoHeight;
+  const s = Math.max(box.width / vw, box.height / vh), ox = (box.width - vw * s) / 2, oy = (box.height - vh * s) / 2;
+  const toSvg = p => [((ox + (1 - p.x) * vw * s) / box.width) * 300, ((oy + p.y * vh * s) / box.height) * 400];
+  let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+  ovalOrder().forEach(i => { const [x, y] = toSvg(lm[i]); x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); });
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, h = y1 - y0;
+  const nose = toSvg(lm[1])[0], L = toSvg(lm[234])[0], R = toSvg(lm[454])[0];
+  const yaw = (nose - Math.min(L, R)) / Math.max(1, Math.abs(R - L));
+  const roll = Math.abs(lm[33].y - lm[263].y) / Math.max(1e-3, Math.abs(lm[33].x - lm[263].x));
+  if (h < 290 * 0.62) return '조금 더 가까이 와주세요';
+  if (h > 290 * 1.05) return '조금만 뒤로 가주세요';
+  if (Math.abs(cx - 150) > 30 || Math.abs(cy - 205) > 38) return '얼굴을 원 가운데에 맞춰주세요';
+  if (yaw < 0.33 || yaw > 0.67 || roll > 0.2) return '정면을 바라봐주세요';
+  return null;
+}
+function loop(){
+  raf = requestAnimationFrame(loop);
+  if (done || !stream || camVid.readyState < 2 || !lmk) return;
+  let ts = performance.now(); if (ts <= lastTs) ts = lastTs + 1; lastTs = ts;
+  const res = lmk.detectForVideo(camVid, ts);
+  const lm = res.faceLandmarks && res.faceLandmarks[0];
+  if (!lm){ holdStart = 0; setProg(0); setMsg('얼굴이 보이지 않아요'); return; }
+  const problem = check(lm);
+  if (problem){ holdStart = 0; setProg(0); setMsg(problem); return; }
+  if (!holdStart) holdStart = ts;
+  const p = (ts - holdStart) / HOLD_MS; setProg(p);
+  setMsg('좋아요! 그대로 유지해주세요', true);
+  if (p >= 1){
+    done = true; progEl.classList.add('done'); $('check').classList.add('on'); setMsg('인식 완료!', true);
+    navigator.vibrate && navigator.vibrate(40);
+    captureFace(camVid, camVid.videoWidth, camVid.videoHeight, lm, true);
+    setTimeout(() => { stopScan(); startPlay(); }, 650);
+  }
 }
 
-/* 사진 */
+/* 영상 반복 재생 */
+function startPlay(){
+  show('play'); vid.loop = true; vid.currentTime = 0; vid.muted = false; $('sound').style.display = 'none';
+  vid.play().catch(() => { vid.muted = true; vid.play(); $('sound').style.display = 'block'; });
+}
+$('sound').onclick = () => { vid.muted = false; vid.play(); $('sound').style.display = 'none'; };
+$('exit').onclick = () => { vid.pause(); startScan(); };
+
+/* 버튼 */
+$('start').onclick = () => { unlockAudio(); startScan(); };
+$('back').onclick = () => { stopScan(); show('intro'); };
+$('photoBtn').onclick = () => { unlockAudio(); $('file').click(); };
 $('file').addEventListener('change', async e => {
-  const f = e.target.files[0]; if (!f) return;
-  stopCam();
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  toast('얼굴을 찾고 있어요…');
   const img = new Image(); img.src = URL.createObjectURL(f); await img.decode();
-  const det = await getDetector('IMAGE');
-  const box = biggest(det.detect(img));
-  if (!box){ setStatus('😢 사진에서 얼굴을 못 찾았어. 정면 사진으로 다시 해봐'); return; }
-  sm = null; cropFace(img, img.naturalWidth, img.naturalHeight, box, false, false);
-  frozen = true; $('camBox').style.display = 'block'; $('camBox').classList.remove('miss');
-  setStatus('✅ 얼굴 인식 완료!'); setTimeout(() => setStatus(''), 1800);
-  hideOverlay(); play();
-  e.target.value = '';
+  const res = (await engine('IMAGE')).detect(img);
+  const lm = res.faceLandmarks && res.faceLandmarks[0];
+  if (!lm){ toast('사진에서 얼굴을 찾지 못했어요'); return; }
+  captureFace(img, img.naturalWidth, img.naturalHeight, lm, false);
+  startPlay();
 });
-
-/* 카메라 실시간 */
-let camStream = null, camLoop = 0, lastTs = -1;
-async function startCam(){
-  try {
-    camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
-  } catch (e) { setStatus('카메라 권한이 필요해 (설정에서 허용해줘)'); return; }
-  camVid.srcObject = camStream; await camVid.play();
-  await getDetector('VIDEO');
-  frozen = false; sm = null;
-  $('btnCam').textContent = '■ 카메라 끄기'; $('btnCam').classList.remove('pri'); $('btnCam').classList.add('on');
-  $('btnFreeze').disabled = false; $('btnFreeze').textContent = '📌 얼굴 고정';
-  $('camBox').style.display = 'block';
-  hideOverlay(); play();
-  let miss = 0;
-  const step = () => {
-    if (!camStream) return;
-    if (!frozen && camVid.readyState >= 2){
-      let ts = performance.now(); if (ts <= lastTs) ts = lastTs + 1; lastTs = ts;
-      const box = biggest(detector.detectForVideo(camVid, ts));
-      if (box){ miss = 0; cropFace(camVid, camVid.videoWidth, camVid.videoHeight, box, true, true); $('camBox').classList.remove('miss'); setStatus(''); }
-      else if (++miss > 8){ $('camBox').classList.add('miss'); setStatus('얼굴이 안 보여… 카메라를 봐줘 👀'); }
-    }
-    camLoop = requestAnimationFrame(step);
-  };
-  step();
-}
-function stopCam(){
-  if (camStream){ camStream.getTracks().forEach(t => t.stop()); camStream = null; }
-  cancelAnimationFrame(camLoop);
-  $('btnCam').textContent = '📷 카메라로 인식'; $('btnCam').classList.add('pri'); $('btnCam').classList.remove('on');
-  $('btnFreeze').disabled = true;
-}
-$('btnCam').onclick = () => camStream ? (stopCam(), frozen = true) : startCam();
-$('btnFreeze').onclick = () => {
-  frozen = !frozen;
-  $('btnFreeze').textContent = frozen ? '🔓 고정 풀기' : '📌 얼굴 고정';
-  $('btnFreeze').classList.toggle('on', frozen);
-};
-
-/* 재생 */
-function hideOverlay(){ $('overlay').classList.add('hide'); }
-function play(){ vid.muted = false; vid.play().catch(() => { vid.muted = true; vid.play(); }); }
-$('btnPlay').onclick = () => { hideOverlay(); vid.paused ? play() : vid.pause(); };
-['zoom', 'offY', 'shade'].forEach(id => $(id).addEventListener('input', () => { if (vid.paused) render(); }));
-
-/* 녹화 */
-let actx = null, aDest = null;
-function audioStream(){
-  try {
-    if (!actx){ actx = new (window.AudioContext || window.webkitAudioContext)();
-      const srcNode = actx.createMediaElementSource(vid); aDest = actx.createMediaStreamDestination();
-      srcNode.connect(aDest); srcNode.connect(actx.destination); }
-    actx.resume(); return aDest.stream.getAudioTracks();
-  } catch (e) { return []; }
-}
-$('btnRec').onclick = async () => {
-  if (!hasFace){ setStatus('먼저 카메라나 사진으로 얼굴을 인식시켜줘'); return; }
-  const types = ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm'];
-  const mime = types.find(t => window.MediaRecorder && MediaRecorder.isTypeSupported(t));
-  if (!mime || !out.captureStream){ setStatus('이 브라우저는 녹화를 지원 안 해 😢 (화면 녹화로 저장해줘)'); return; }
-  const stream = new MediaStream([...out.captureStream(30).getVideoTracks(), ...audioStream()]);
-  const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 6e6 });
-  const chunks = []; rec.ondataavailable = e => e.data.size && chunks.push(e.data);
-  rec.onstop = () => {
-    const blob = new Blob(chunks, { type: mime.split(';')[0] });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-    a.download = 'face-hero.' + (mime.includes('mp4') ? 'mp4' : 'webm'); a.click();
-    $('recBadge').style.display = 'none'; $('btnRec').disabled = false; vid.loop = true;
-    setStatus('💾 저장 완료!'); setTimeout(() => setStatus(''), 2500);
-  };
-  $('btnRec').disabled = true; $('recBadge').style.display = 'block'; hideOverlay();
-  vid.loop = false; vid.pause(); vid.currentTime = 0;
-  await new Promise(r => vid.addEventListener('seeked', r, { once: true }));
-  rec.start(250); vid.muted = false; await vid.play();
-  vid.addEventListener('ended', () => { setTimeout(() => rec.stop(), 150); vid.currentTime = 0; vid.loop = true; play(); }, { once: true });
-};
 </script>
 </body>
 </html>
