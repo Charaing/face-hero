@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0f0c">
+<title>내 얼굴 히어로 — FACE HERO</title>
+<style>
+  :root{--bg:#0b0f0c;--panel:#141a16;--line:#25302a;--txt:#eaf5ec;--dim:#8fa597;--neon:#39ff6a;--red:#ff3b54}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Noto Sans KR",sans-serif}
+  main{max-width:520px;margin:0 auto;padding:max(14px,env(safe-area-inset-top)) 14px 40px}
+  header{display:flex;align-items:baseline;justify-content:space-between;margin:4px 2px 12px}
+  h1{font-size:22px;margin:0;letter-spacing:-.5px;font-weight:900}
+  h1 b{color:var(--neon)}
+  .tag{font-size:12px;color:var(--dim)}
+  .stage{position:relative;width:100%;aspect-ratio:9/16;border-radius:18px;overflow:hidden;background:#000;border:1px solid var(--line)}
+  #out{width:100%;height:100%;display:block}
+  .cam{position:absolute;right:10px;top:10px;width:26%;aspect-ratio:1;border-radius:50%;overflow:hidden;border:3px solid var(--neon);background:#111;box-shadow:0 4px 18px #0008;display:none}
+  .cam canvas{width:100%;height:100%;display:block}
+  .cam.miss{border-color:var(--red)}
+  .overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:#000b;text-align:center;padding:24px}
+  .overlay.hide{display:none}
+  .big{font-size:18px;font-weight:800}
+  .status{position:absolute;left:10px;bottom:10px;right:10px;font-size:13px;background:#000a;padding:7px 10px;border-radius:10px;backdrop-filter:blur(6px)}
+  .status.hide{display:none}
+  .rec{position:absolute;left:12px;top:12px;background:var(--red);color:#fff;font-weight:800;font-size:12px;padding:5px 9px;border-radius:99px;display:none;animation:bl 1s infinite}
+  @keyframes bl{50%{opacity:.4}}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+  button,.btn{appearance:none;border:1px solid var(--line);background:var(--panel);color:var(--txt);font:inherit;font-weight:700;font-size:15px;padding:14px 10px;border-radius:14px;cursor:pointer;text-align:center;display:block}
+  button:active,.btn:active{transform:scale(.98)}
+  button.pri{background:var(--neon);color:#062010;border-color:var(--neon)}
+  button.on{border-color:var(--neon);color:var(--neon)}
+  button:disabled{opacity:.4}
+  .wide{grid-column:1/-1}
+  .ctl{margin-top:14px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+  .ctl label{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--dim);margin:6px 0}
+  .ctl label span{width:64px;flex:none}
+  .ctl input[type=range]{flex:1;accent-color:var(--neon)}
+  input[type=file]{display:none}
+  .foot{margin-top:16px;font-size:12px;color:var(--dim);line-height:1.6}
+  a{color:var(--neon)}
+</style>
+</head>
+<body>
+<main>
+  <header><h1>FACE <b>HERO</b></h1><span class="tag">얼굴 인식 → 초록 머리 합성</span></header>
+
+  <div class="stage">
+    <canvas id="out" width="720" height="1280"></canvas>
+    <div class="cam" id="camBox"><canvas id="camView" width="256" height="256"></canvas></div>
+    <div class="rec" id="recBadge">● REC</div>
+    <div class="status hide" id="status"></div>
+    <div class="overlay" id="overlay">
+      <div class="big">내 얼굴을 히어로 머리에!</div>
+      <div class="tag">카메라로 실시간 인식하거나 사진을 올려줘</div>
+    </div>
+  </div>
+
+  <div class="row">
+    <button class="pri" id="btnCam">📷 카메라로 인식</button>
+    <label class="btn" for="file">🖼️ 사진 올리기</label>
+    <input type="file" id="file" accept="image/*">
+    <button id="btnPlay" disabled>▶ 재생</button>
+    <button id="btnFreeze" disabled>📌 얼굴 고정</button>
+    <button class="wide" id="btnRec" disabled>⏺ 처음부터 녹화해서 저장</button>
+  </div>
+
+  <div class="ctl">
+    <label><span>얼굴 크기</span><input id="zoom" type="range" min="0.7" max="1.6" step="0.01" value="1"></label>
+    <label><span>위/아래</span><input id="offY" type="range" min="-0.3" max="0.3" step="0.01" value="0"></label>
+    <label><span>입체감</span><input id="shade" type="range" min="0" max="1" step="0.01" value="0.55"></label>
+  </div>
+
+  <p class="foot">얼굴 인식은 전부 내 폰 안에서만 돌아가고, 사진·영상은 어디에도 업로드되지 않아.<br>얼굴 인식: MediaPipe Face Detector</p>
+</main>
+
+<video id="vid" src="assets/hero.mp4" playsinline loop preload="auto" crossorigin="anonymous" style="display:none"></video>
+<video id="camVid" playsinline muted style="display:none"></video>
+
+<script type="module">
+import { FaceDetector, FilesetResolver } from "./lib/vision_bundle.mjs";
+
+const $ = id => document.getElementById(id);
+const vid = $('vid'), camVid = $('camVid'), out = $('out');
+const statusEl = $('status');
+const setStatus = (t) => { statusEl.textContent = t || ''; statusEl.classList.toggle('hide', !t); };
+
+/* ---------- 초록 머리 위치 데이터 (영상 분석으로 미리 추출) ---------- */
+let track = { fps: 24, frames: [] };
+fetch('assets/track.json').then(r => r.json()).then(j => track = j);
+
+/* ---------- 얼굴 텍스처 캔버스 ---------- */
+const FACE = 512;
+const faceCan = document.createElement('canvas'); faceCan.width = faceCan.height = FACE;
+const fctx = faceCan.getContext('2d');
+let hasFace = false, faceDirty = false, frozen = false;
+const camView = $('camView'), cvctx = camView.getContext('2d');
+
+/* ---------- WebGL 합성 ---------- */
+const gl = out.getContext('webgl', { preserveDrawingBuffer: false, premultipliedAlpha: false });
+const VS = `attribute vec2 p;varying vec2 uv;void main(){uv=vec2(p.x*.5+.5,.5-p.y*.5);gl_Position=vec4(p,0.,1.);}`;
+const FS = `precision highp float;varying vec2 uv;
+uniform sampler2D tv,tf;uniform vec3 circ;uniform float has,zoom,offY,shadeAmt;uniform vec2 res;
+float luma(vec3 c){return dot(c,vec3(.299,.587,.114));}
+void main(){
+  vec4 v=texture2D(tv,uv);vec3 c=v.rgb;
+  if(circ.z<=0.){gl_FragColor=vec4(c,1.);return;}
+  vec2 px=uv*res;vec2 cp=vec2(circ.x,circ.y)*res;float r=circ.z*res.x;
+  float d=distance(px,cp)/r;
+  float key=clamp((c.g-max(c.r,c.b)-.10)/.16,0.,1.);
+  float dark=step(luma(c),.22)*step(c.b-c.r,.08)*(1.-smoothstep(.80,.88,d));
+  float region=1.-smoothstep(1.03,1.10,d);
+  float a=region*max(key,dark);
+  // 가장자리 초록 번짐 제거
+  float near=1.-smoothstep(1.0,1.25,d);
+  vec3 base=c; float spill=max(0.,c.g-max(c.r,c.b));
+  base.g-=spill*near*(1.-a)*.85;
+  if(has<.5){gl_FragColor=vec4(c,1.);return;}
+  vec2 q=(px-cp)/(2.*r*zoom); q.y-=offY; vec2 fuv=q+.5;
+  vec3 f=texture2D(tf,clamp(fuv,0.,1.)).rgb;
+  // 원래 구의 명암을 얼굴에 입혀 입체감
+  float sh=clamp(luma(c)/.62,.45,1.35); sh=mix(1.,sh,shadeAmt*key);
+  f*=sh;
+  gl_FragColor=vec4(mix(base,f,a),1.);
+}`;
+function sh(type, src){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw gl.getShaderInfoLog(s);return s;}
+const prog = gl.createProgram();
+gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
+gl.linkProgram(prog); gl.useProgram(prog);
+const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,1,1]), gl.STATIC_DRAW);
+const loc = gl.getAttribLocation(prog, 'p'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+function mkTex(unit){const t=gl.createTexture();gl.activeTexture(gl.TEXTURE0+unit);gl.bindTexture(gl.TEXTURE_2D,t);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([0,0,0,255]));return t;}
+const texV = mkTex(0), texF = mkTex(1);
+const U = n => gl.getUniformLocation(prog, n);
+gl.uniform1i(U('tv'), 0); gl.uniform1i(U('tf'), 1); gl.uniform2f(U('res'), 720, 1280);
+
+function circleAt(t){
+  const fr = track.frames; if (!fr.length) return null;
+  const i = Math.min(fr.length - 1, Math.max(0, Math.floor(t * track.fps + 0.001)));
+  return fr[i];
+}
+let videoReady = false;
+function render(mediaTime){
+  if (!videoReady) return;
+  gl.viewport(0, 0, out.width, out.height);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, texV);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, vid);
+  if (faceDirty){ gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, texF);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, faceCan); faceDirty = false; }
+  const c = circleAt(mediaTime ?? vid.currentTime);
+  gl.uniform3f(U('circ'), c ? c[0] : 0, c ? c[1] : 0, c ? c[2] : 0);
+  gl.uniform1f(U('has'), hasFace ? 1 : 0);
+  gl.uniform1f(U('zoom'), +$('zoom').value);
+  gl.uniform1f(U('offY'), +$('offY').value);
+  gl.uniform1f(U('shadeAmt'), +$('shade').value);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+}
+// 영상 프레임에 정확히 맞춰 그리기
+if ('requestVideoFrameCallback' in HTMLVideoElement.prototype){
+  const loop = (now, meta) => { render(meta.mediaTime); vid.requestVideoFrameCallback(loop); };
+  vid.requestVideoFrameCallback(loop);
+} else {
+  const loop = () => { render(); requestAnimationFrame(loop); }; requestAnimationFrame(loop);
+}
+vid.addEventListener('loadeddata', () => { videoReady = true; $('btnPlay').disabled = false; $('btnRec').disabled = false; render(0); });
+vid.addEventListener('seeked', () => render());
+vid.addEventListener('play', () => $('btnPlay').textContent = '⏸ 일시정지');
+vid.addEventListener('pause', () => $('btnPlay').textContent = '▶ 재생');
+vid.load();
+
+/* ---------- 얼굴 인식 ---------- */
+let detector = null, detMode = null;
+async function getDetector(mode){
+  if (!detector){
+    setStatus('얼굴 인식 엔진 불러오는 중…');
+    const fs = await FilesetResolver.forVisionTasks(new URL('lib/wasm', location.href).href.replace(/\/$/, ''));
+    const base = { modelAssetPath: 'assets/face_detector.tflite' };
+    try { detector = await FaceDetector.createFromOptions(fs, { baseOptions: { ...base, delegate: 'GPU' }, runningMode: mode, minDetectionConfidence: 0.5 }); }
+    catch (e) { detector = await FaceDetector.createFromOptions(fs, { baseOptions: { ...base, delegate: 'CPU' }, runningMode: mode, minDetectionConfidence: 0.5 }); }
+    detMode = mode; setStatus('');
+  }
+  if (detMode !== mode){ await detector.setOptions({ runningMode: mode }); detMode = mode; }
+  return detector;
+}
+function biggest(res){
+  if (!res || !res.detections || !res.detections.length) return null;
+  return res.detections.reduce((a, b) => (b.boundingBox.width * b.boundingBox.height > a.boundingBox.width * a.boundingBox.height ? b : a)).boundingBox;
+}
+// 얼굴 박스 → 정사각형 크롭(이마·턱 포함)해서 텍스처로
+let sm = null;
+function cropFace(src, sw, sh, box, mirror, smooth){
+  let cx = box.originX + box.width / 2, cy = box.originY + box.height * 0.42;
+  let s = Math.max(box.width, box.height) * 1.32;
+  if (smooth && sm){ const k = 0.35; cx = sm.cx + (cx - sm.cx) * k; cy = sm.cy + (cy - sm.cy) * k; s = sm.s + (s - sm.s) * k; }
+  sm = { cx, cy, s };
+  fctx.save(); fctx.fillStyle = '#d9b49a'; fctx.fillRect(0, 0, FACE, FACE);
+  const sc = FACE / s;
+  if (mirror){ fctx.translate(FACE, 0); fctx.scale(-1, 1); }
+  fctx.translate(FACE / 2, FACE / 2); fctx.scale(sc, sc); fctx.translate(-cx, -cy);
+  fctx.drawImage(src, 0, 0, sw, sh);
+  fctx.restore();
+  hasFace = true; faceDirty = true;
+  cvctx.drawImage(faceCan, 0, 0, camView.width, camView.height);
+  if (vid.paused) render();
+}
+
+/* 사진 */
+$('file').addEventListener('change', async e => {
+  const f = e.target.files[0]; if (!f) return;
+  stopCam();
+  const img = new Image(); img.src = URL.createObjectURL(f); await img.decode();
+  const det = await getDetector('IMAGE');
+  const box = biggest(det.detect(img));
+  if (!box){ setStatus('😢 사진에서 얼굴을 못 찾았어. 정면 사진으로 다시 해봐'); return; }
+  sm = null; cropFace(img, img.naturalWidth, img.naturalHeight, box, false, false);
+  frozen = true; $('camBox').style.display = 'block'; $('camBox').classList.remove('miss');
+  setStatus('✅ 얼굴 인식 완료!'); setTimeout(() => setStatus(''), 1800);
+  hideOverlay(); play();
+  e.target.value = '';
+});
+
+/* 카메라 실시간 */
+let camStream = null, camLoop = 0, lastTs = -1;
+async function startCam(){
+  try {
+    camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
+  } catch (e) { setStatus('카메라 권한이 필요해 (설정에서 허용해줘)'); return; }
+  camVid.srcObject = camStream; await camVid.play();
+  await getDetector('VIDEO');
+  frozen = false; sm = null;
+  $('btnCam').textContent = '■ 카메라 끄기'; $('btnCam').classList.remove('pri'); $('btnCam').classList.add('on');
+  $('btnFreeze').disabled = false; $('btnFreeze').textContent = '📌 얼굴 고정';
+  $('camBox').style.display = 'block';
+  hideOverlay(); play();
+  let miss = 0;
+  const step = () => {
+    if (!camStream) return;
+    if (!frozen && camVid.readyState >= 2){
+      let ts = performance.now(); if (ts <= lastTs) ts = lastTs + 1; lastTs = ts;
+      const box = biggest(detector.detectForVideo(camVid, ts));
+      if (box){ miss = 0; cropFace(camVid, camVid.videoWidth, camVid.videoHeight, box, true, true); $('camBox').classList.remove('miss'); setStatus(''); }
+      else if (++miss > 8){ $('camBox').classList.add('miss'); setStatus('얼굴이 안 보여… 카메라를 봐줘 👀'); }
+    }
+    camLoop = requestAnimationFrame(step);
+  };
+  step();
+}
+function stopCam(){
+  if (camStream){ camStream.getTracks().forEach(t => t.stop()); camStream = null; }
+  cancelAnimationFrame(camLoop);
+  $('btnCam').textContent = '📷 카메라로 인식'; $('btnCam').classList.add('pri'); $('btnCam').classList.remove('on');
+  $('btnFreeze').disabled = true;
+}
+$('btnCam').onclick = () => camStream ? (stopCam(), frozen = true) : startCam();
+$('btnFreeze').onclick = () => {
+  frozen = !frozen;
+  $('btnFreeze').textContent = frozen ? '🔓 고정 풀기' : '📌 얼굴 고정';
+  $('btnFreeze').classList.toggle('on', frozen);
+};
+
+/* 재생 */
+function hideOverlay(){ $('overlay').classList.add('hide'); }
+function play(){ vid.muted = false; vid.play().catch(() => { vid.muted = true; vid.play(); }); }
+$('btnPlay').onclick = () => { hideOverlay(); vid.paused ? play() : vid.pause(); };
+['zoom', 'offY', 'shade'].forEach(id => $(id).addEventListener('input', () => { if (vid.paused) render(); }));
+
+/* 녹화 */
+let actx = null, aDest = null;
+function audioStream(){
+  try {
+    if (!actx){ actx = new (window.AudioContext || window.webkitAudioContext)();
+      const srcNode = actx.createMediaElementSource(vid); aDest = actx.createMediaStreamDestination();
+      srcNode.connect(aDest); srcNode.connect(actx.destination); }
+    actx.resume(); return aDest.stream.getAudioTracks();
+  } catch (e) { return []; }
+}
+$('btnRec').onclick = async () => {
+  if (!hasFace){ setStatus('먼저 카메라나 사진으로 얼굴을 인식시켜줘'); return; }
+  const types = ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm'];
+  const mime = types.find(t => window.MediaRecorder && MediaRecorder.isTypeSupported(t));
+  if (!mime || !out.captureStream){ setStatus('이 브라우저는 녹화를 지원 안 해 😢 (화면 녹화로 저장해줘)'); return; }
+  const stream = new MediaStream([...out.captureStream(30).getVideoTracks(), ...audioStream()]);
+  const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 6e6 });
+  const chunks = []; rec.ondataavailable = e => e.data.size && chunks.push(e.data);
+  rec.onstop = () => {
+    const blob = new Blob(chunks, { type: mime.split(';')[0] });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = 'face-hero.' + (mime.includes('mp4') ? 'mp4' : 'webm'); a.click();
+    $('recBadge').style.display = 'none'; $('btnRec').disabled = false; vid.loop = true;
+    setStatus('💾 저장 완료!'); setTimeout(() => setStatus(''), 2500);
+  };
+  $('btnRec').disabled = true; $('recBadge').style.display = 'block'; hideOverlay();
+  vid.loop = false; vid.pause(); vid.currentTime = 0;
+  await new Promise(r => vid.addEventListener('seeked', r, { once: true }));
+  rec.start(250); vid.muted = false; await vid.play();
+  vid.addEventListener('ended', () => { setTimeout(() => rec.stop(), 150); vid.currentTime = 0; vid.loop = true; play(); }, { once: true });
+};
+</script>
+</body>
+</html>
