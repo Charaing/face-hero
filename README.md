@@ -5,7 +5,7 @@
 👉 https://charaing.github.io/face-hero/
 
 - 흰 배경 토스 스타일 인식 화면: 얼굴을 윤곽선 안에 맞추고 2초 유지하면 자동 인식
-- MediaPipe Face Landmarker(468점)의 얼굴 윤곽으로 얼굴만 누끼 → 오려낸 얼굴 자체를 히어로 머리로 부착
+- 얼굴 윤곽(Face Landmarker) + 머리카락 분리(Selfie Multiclass Segmenter)로 얼굴·머리카락만 누끼 → 히어로 머리로 부착
 - 영상 속 초록 머리 위치는 프레임별로 미리 추적한 데이터(`assets/track.json`) 사용 → 팔이 얼굴을 가려도 자연스럽게 합성
 - 인식되면 영상이 무한 반복, 오른쪽 위 "나가기"로 다시 인식
 - 얼굴 인식은 기기 안에서만 동작

@@ -91,7 +91,7 @@
 <video id="vid" src="assets/hero.mp4" playsinline loop preload="auto" crossorigin="anonymous" style="display:none"></video>
 
 <script type="module">
-import { FaceLandmarker, FilesetResolver } from "./lib/vision_bundle.mjs";
+import { FaceLandmarker, ImageSegmenter, FilesetResolver } from "./lib/vision_bundle.mjs";
 const $ = id => document.getElementById(id);
 const vid = $('vid'), camVid = $('camVid'), out = $('out');
 const HOLD_MS = 2000;
@@ -112,7 +112,7 @@ const faceCan = document.createElement('canvas'); faceCan.width = faceCan.height
 const fctx = faceCan.getContext('2d', { willReadFrequently: true });
 const maskCan = document.createElement('canvas'); maskCan.width = maskCan.height = FACE;
 const mctx = maskCan.getContext('2d');
-let skin = [0.85, 0.68, 0.58], faceW = 0.7, chinY = 0.98, hasFace = false, faceDirty = false;
+let skin = [0.85, 0.68, 0.58], faceW = 0.7, chinY = 0.98, faceCx = 0.5, hasFace = false, faceDirty = false;
 
 let OVAL = null;
 function ovalOrder(){
@@ -124,37 +124,84 @@ function ovalOrder(){
   return OVAL = order;
 }
 
-// 랜드마크 윤곽으로 얼굴만 오려서 텍스처로
-function captureFace(src, sw, sh, lm, mirror){
+// 머리카락 분리 모델 (selfie multiclass: 0배경 1머리카락 2몸피부 3얼굴피부 4옷 5기타)
+let seg = null, segLoading = null;
+function segmenter(){
+  return segLoading ??= (async () => {
+    const fs = await FilesetResolver.forVisionTasks(new URL('lib/wasm', location.href).href);
+    seg = await ImageSegmenter.createFromOptions(fs, { baseOptions: { modelAssetPath: 'assets/hair_seg.tflite', delegate: 'CPU' },
+      runningMode: 'IMAGE', outputCategoryMask: false, outputConfidenceMasks: true });
+    return seg;
+  })();
+}
+const snap = document.createElement('canvas'), sctx = snap.getContext('2d', { willReadFrequently: true });
+const mfull = document.createElement('canvas'), mfctx = mfull.getContext('2d');
+
+// 얼굴 + 머리카락만 오려서 텍스처로
+async function captureFace(src, sw, sh, lm, mirror){
+  snap.width = sw; snap.height = sh; sctx.drawImage(src, 0, 0, sw, sh);
   const P = ovalOrder().map(i => [lm[i].x * sw, lm[i].y * sh]);
   let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
   P.forEach(([x, y]) => { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); });
-  const H = y1 - y0, ext = H * 0.06; y0 -= ext;              // 윤곽 맨 위가 이마 중간이라 살짝 위로
-  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, S = (y1 - y0) * 1.02;
-  const tx = (x, y) => { const u = (x - cx) / S * FACE + FACE / 2, v = (y - cy) / S * FACE + FACE / 2; return [mirror ? FACE - u : u, v]; };
-  const T = P.map(([x, y]) => { const k = Math.max(0, (cy - y) / (H / 2)); return tx(x, y - ext * k * k); });
+  const H = y1 - y0, W = x1 - x0, fcx = (x0 + x1) / 2, chin = y1;
 
-  // 마스크: 윤곽 채우고 가장자리는 안쪽으로 부드럽게
-  mctx.globalCompositeOperation = 'source-over'; mctx.clearRect(0, 0, FACE, FACE); mctx.fillStyle = '#fff';
-  const path = new Path2D(); T.forEach(([u, v], i) => i ? path.lineTo(u, v) : path.moveTo(u, v)); path.closePath();
-  mctx.fill(path);
-  mctx.globalCompositeOperation = 'destination-out'; mctx.lineJoin = 'round'; mctx.strokeStyle = 'rgba(0,0,0,.16)';
-  for (let w = 26; w >= 2; w -= 4){ mctx.lineWidth = w; mctx.stroke(path); }
+  // 1) 분할 마스크 (해상도 낮춰 계산)
+  const MW = 256, MH = Math.round(256 * sh / sw);
+  const md = new ImageData(MW, MH);
+  let ok = false;
+  try {
+    const sg = await segmenter();
+    const small = document.createElement('canvas'); small.width = MW; small.height = MH;
+    small.getContext('2d').drawImage(snap, 0, 0, MW, MH);
+    const res = sg.segment(small);
+    const cm = res.confidenceMasks;
+    if (cm && cm.length >= 4){
+      const hair = cm[1].getAsFloat32Array(), body = cm[2].getAsFloat32Array(), face = cm[3].getAsFloat32Array();
+      const mw = cm[1].width, mh = cm[1].height;
+      for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++){
+        const i = Math.min(mh - 1, Math.round(y * mh / MH)) * mw + Math.min(mw - 1, Math.round(x * mw / MW));
+        const X = x * sw / MW, Y = y * sh / MH;
+        // 얼굴 근처만 (다른 사람·배경 머리카락 제외), 턱 아래는 목 빼고 머리카락만 조금
+        const near = Math.abs(X - fcx) < W * 1.25 && Y > y0 - H * 0.9;
+        const belowChin = Y > chin + H * 0.02;
+        let v = hair[i] * (Y < chin + H * 0.35 ? 1 : 0) + (belowChin ? 0 : face[i] + body[i] * (Math.abs(X - fcx) < W * 0.7 ? 1 : 0));
+        v = near ? Math.min(1, Math.max(0, (v - 0.35) / 0.4)) : 0;
+        md.data[(y * MW + x) * 4 + 3] = v * 255;
+      }
+      cm.forEach(m => m.close && m.close()); ok = true;
+    }
+  } catch (e) { console.warn('hair seg failed', e); }
 
+  // 2) 마스크를 원본 크기로 + 얼굴 윤곽 합치기
+  mfull.width = sw; mfull.height = sh;
+  if (ok){ const t = document.createElement('canvas'); t.width = MW; t.height = MH; t.getContext('2d').putImageData(md, 0, 0);
+    mfctx.imageSmoothingEnabled = true; mfctx.filter = 'blur(1.5px)'; mfctx.drawImage(t, 0, 0, sw, sh); mfctx.filter = 'none'; }
+  const oval = new Path2D(); P.forEach(([x, y], i) => i ? oval.lineTo(x, y - (y < (y0 + y1) / 2 ? H * 0.06 * ((y0 + y1) / 2 - y) / (H / 2) : 0)) : oval.moveTo(x, y)); oval.closePath();
+  mfctx.fillStyle = '#fff'; mfctx.fill(oval);
+
+  // 3) 마스크 영역 박스
+  const md2 = mfctx.getImageData(0, 0, sw, sh).data;
+  let bx0 = x0, bx1 = x1, by0 = y0, by1 = y1; const st = Math.max(1, Math.round(sw / 320));
+  for (let y = 0; y < sh; y += st) for (let x = 0; x < sw; x += st) if (md2[(y * sw + x) * 4 + 3] > 60){
+    if (x < bx0) bx0 = x; if (x > bx1) bx1 = x; if (y < by0) by0 = y; if (y > by1) by1 = y; }
+  const S = Math.max(bx1 - bx0, by1 - by0) * 1.06, cx = (bx0 + bx1) / 2, cy = (by0 + by1) / 2;
+
+  // 4) 텍스처: 이미지 × 마스크 (가장자리 살짝 부드럽게)
   fctx.save(); fctx.globalCompositeOperation = 'source-over'; fctx.clearRect(0, 0, FACE, FACE);
   if (mirror){ fctx.translate(FACE, 0); fctx.scale(-1, 1); }
   const sc = FACE / S; fctx.translate(FACE / 2, FACE / 2); fctx.scale(sc, sc); fctx.translate(-cx, -cy);
-  fctx.drawImage(src, 0, 0, sw, sh); fctx.restore();
+  fctx.drawImage(snap, 0, 0, sw, sh);
+  fctx.globalCompositeOperation = 'destination-in'; fctx.filter = 'blur(1px)'; fctx.drawImage(mfull, 0, 0, sw, sh); fctx.filter = 'none';
+  fctx.restore(); fctx.globalCompositeOperation = 'source-over';
 
-  // 피부색 (양 볼, 이마, 턱 주변 평균) → 얼굴 바깥 머리 부분 채움
+  // 얼굴 위치 정보 (텍스처 좌표)
+  faceW = W / S; chinY = 0.5 + (chin - cy) / S;
+  faceCx = 0.5 + (fcx - cx) / S; if (mirror) faceCx = 1 - faceCx;
+  // 피부색
   let r = 0, g = 0, b = 0, n = 0;
-  [50, 280, 151, 205, 425].map(i => tx(lm[i].x * sw, lm[i].y * sh)).forEach(([u, v]) => {
-    const d = fctx.getImageData(Math.max(0, u - 6) | 0, Math.max(0, v - 6) | 0, 12, 12).data;
-    for (let i = 0; i < d.length; i += 4){ r += d[i]; g += d[i + 1]; b += d[i + 2]; n++; } });
+  [50, 280, 151].forEach(i => { const d = sctx.getImageData(Math.max(0, lm[i].x * sw - 5) | 0, Math.max(0, lm[i].y * sh - 5) | 0, 10, 10).data;
+    for (let j = 0; j < d.length; j += 4){ r += d[j]; g += d[j + 1]; b += d[j + 2]; n++; } });
   if (n) skin = [r / n / 255, g / n / 255, b / n / 255];
-
-  fctx.globalCompositeOperation = 'destination-in'; fctx.drawImage(maskCan, 0, 0); fctx.globalCompositeOperation = 'source-over';
-  faceW = (x1 - x0) / S; chinY = 0.5 + (y1 - cy) / S;
   hasFace = true; faceDirty = true;
 }
 
@@ -162,7 +209,7 @@ function captureFace(src, sw, sh, lm, mirror){
 const gl = out.getContext('webgl', { premultipliedAlpha: false });
 const VS = `attribute vec2 p;varying vec2 uv;void main(){uv=vec2(p.x*.5+.5,.5-p.y*.5);gl_Position=vec4(p,0.,1.);}`;
 const FS = `precision highp float;varying vec2 uv;
-uniform sampler2D tv,tf;uniform vec3 circ,skin;uniform float has,faceW,chinY;uniform vec2 res;
+uniform sampler2D tv,tf;uniform vec3 circ,skin;uniform float has,faceW,chinY,faceCx;uniform vec2 res;
 float luma(vec3 c){return dot(c,vec3(.299,.587,.114));}
 void main(){
   vec3 c=texture2D(tv,uv).rgb;
@@ -174,15 +221,19 @@ void main(){
   float inS=1.-smoothstep(1.03,1.10,d);
   float g=inS*max(key,dark);              // 초록 머리 픽셀
   // 얼굴 자체를 머리로: 턱을 목 위치에, 얼굴 폭이 초록 머리 폭을 덮도록
-  float k=(2.*r*1.14)/faceW;
-  vec2 fuv=vec2(.5,chinY)+(px-vec2(cp.x,cp.y+r*.97))/k;
+  float k=(2.*r*.80)/faceW;
+  vec2 fuv=vec2(faceCx,chinY)+(px-vec2(cp.x,cp.y+r*.93))/k;
   vec4 f=texture2D(tf,clamp(fuv,0.,1.));
   f.a*=step(0.,fuv.x)*step(fuv.x,1.)*step(0.,fuv.y)*step(fuv.y,1.);
   // 초록 번짐 제거
   vec3 base=c;float near=1.-smoothstep(1.,1.25,d);
   base.g-=max(0.,c.g-max(c.r,c.b))*near*(1.-g)*.85;
-  // 얼굴이 못 덮은 초록은 목 그림자처럼
-  base=mix(base,skin*.55,g);
+  // 얼굴이 못 덮은 초록 머리 자리는 바깥 배경을 비춰서 채움
+  vec2 dir=(px-cp)/max(distance(px,cp),1.);
+  vec3 bg=texture2D(tv,clamp((cp+dir*r*(1.14+(1.-min(d,1.))*.7))/res,0.,1.)).rgb;
+  float armC=max(step(.12,c.b-c.r)*step(c.g,c.b),step(.72,min(c.r,min(c.g,c.b))));
+  float ring=smoothstep(.86,.93,d)*(1.-smoothstep(1.06,1.13,d))*(1.-armC)*(1.-smoothstep(.55,.75,dir.y));
+  base=mix(base,bg,max(g,ring));
   // 머리 안쪽: 초록 위에만(팔·소품은 앞에), 머리 밖: 얼굴을 그대로 위에
   // 테두리 링: 팔(파랑)·몸(흰색)만 앞으로, 나머지(구 외곽선)는 얼굴로 덮기
   float arm=max(step(.12,c.b-c.r)*step(c.g,c.b),step(.72,min(c.r,min(c.g,c.b))));
@@ -215,7 +266,7 @@ function render(t){
   const fr = track.frames, c = fr[Math.min(fr.length - 1, Math.max(0, Math.floor((t ?? vid.currentTime) * track.fps + 0.001)))];
   gl.uniform3f(U('circ'), c ? c[0] : 0, c ? c[1] : 0, c ? c[2] : 0);
   gl.uniform3f(U('skin'), skin[0], skin[1], skin[2]);
-  gl.uniform1f(U('has'), hasFace ? 1 : 0); gl.uniform1f(U('faceW'), faceW); gl.uniform1f(U('chinY'), chinY);
+  gl.uniform1f(U('has'), hasFace ? 1 : 0); gl.uniform1f(U('faceW'), faceW); gl.uniform1f(U('chinY'), chinY); gl.uniform1f(U('faceCx'), faceCx);
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 }
 if ('requestVideoFrameCallback' in HTMLVideoElement.prototype){
@@ -262,7 +313,7 @@ async function startScan(){
   } catch (e) { setMsg('카메라 권한을 허용해주세요'); toast('설정에서 카메라 권한을 켜주세요'); return; }
   camVid.srcObject = stream; await camVid.play().catch(() => {});
   await engine('VIDEO'); $('loading').style.display = 'none';
-  scanStart = performance.now(); cancelAnimationFrame(raf); loop();
+  scanStart = performance.now(); segmenter().catch(() => {}); cancelAnimationFrame(raf); loop();
 }
 function stopScan(){ cancelAnimationFrame(raf); if (stream){ stream.getTracks().forEach(t => t.stop()); stream = null; } camVid.srcObject = null; }
 
@@ -303,8 +354,10 @@ function loop(){
   if (p >= 1){
     done = true; progEl.classList.add('done'); $('check').classList.add('on'); setMsg('인식 완료!', true);
     navigator.vibrate && navigator.vibrate(40);
-    captureFace(camVid, camVid.videoWidth, camVid.videoHeight, lm || goodLm, true);
-    setTimeout(() => { stopScan(); startPlay(); }, 650);
+    const t0 = performance.now();
+    if (!seg) setMsg('머리카락 다듬는 중…', true);
+    captureFace(camVid, camVid.videoWidth, camVid.videoHeight, lm || goodLm, true).then(() => {
+      setTimeout(() => { stopScan(); startPlay(); }, Math.max(0, 650 - (performance.now() - t0))); });
   }
 }
 
@@ -327,7 +380,7 @@ $('file').addEventListener('change', async e => {
   const res = (await engine('IMAGE')).detect(img);
   const lm = res.faceLandmarks && res.faceLandmarks[0];
   if (!lm){ toast('사진에서 얼굴을 찾지 못했어요'); return; }
-  captureFace(img, img.naturalWidth, img.naturalHeight, lm, false);
+  await captureFace(img, img.naturalWidth, img.naturalHeight, lm, false);
   startPlay();
 });
 </script>
